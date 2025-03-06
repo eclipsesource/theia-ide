@@ -1,0 +1,74 @@
+name: Publish Theia IDE Preview Deployment
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The image's tag
+        required: true
+        default: next
+      theia_version:
+        description: Theia Version
+        required: false
+        default: next
+  pull_request:
+    branches: [master]
+    types:
+      - opened
+      - synchronize
+      - reopened
+  schedule:
+    - cron: '0 13 * * 0'
+
+jobs:
+  build:
+    name: Build Theia IDE Preview image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+      
+      - name: Set the Theia version
+        id: set-theia-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "THEIA_VERSION=${{ github.event.inputs.theia_version }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "THEIA_VERSION=" >> $GITHUB_ENV
+          else
+            echo "THEIA_VERSION=next" >> $GITHUB_ENV
+          fi
+
+      - name: Run Theia update if version is specified
+        if: ${{ env.THEIA_VERSION != '' }}
+        run: |
+          yarn && yarn update:theia ${THEIA_VERSION} && yarn update:theia:children ${THEIA_VERSION} && yarn
+
+      - name: Set image tag
+        id: set-tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "IMAGE_TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "IMAGE_TAG=pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "IMAGE_TAG=weekly" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=other" >> $GITHUB_ENV
+          fi
+
+      - name: Build Docker image
+        uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6.10.0
+        with:
+          context: .
+          file: browser.Dockerfile
+          push: false
+          tags: |
+            theia-ide-preview:${{ env.IMAGE_TAG }}
