@@ -70,11 +70,14 @@ jobs:
         uses: google-github-actions/auth@71f986410dfbc7added4569d411d040a91dc6935 # v2.1.8
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: kubernetes-238012
+          create_credentials_file: true
 
-      - name: Configure Docker to use Artifact Registry
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a # v2.1.4
+      
+      - name: Configure Docker for Artifact Registry
         run: |
-          echo "${{ secrets.GCP_SA_KEY }}" > "${HOME}/gcloud-service-key.json"
-          gcloud auth activate-service-account --key-file="${HOME}/gcloud-service-key.json"
           gcloud auth configure-docker europe-west3-docker.pkg.dev
 
       - name: Build Docker image
