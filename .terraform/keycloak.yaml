@@ -1,0 +1,26 @@
+fullnameOverride: "keycloak"
+httpRelativePath: "/keycloak/"
+
+auth:
+  adminUser: admin
+
+ingress:
+  enabled: true
+  ingressClassName: "nginx"
+  path: "/keycloak/"
+  annotations:
+    acme.cert-manager.io/http01-edit-in-place: "true"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/common-name: "theia-ide-preview.eclipsesource-munich.com"
+  tls: true
+  hostname: "theia-ide-preview.eclipsesource-munich.com"
+
+postgresql:
+  enabled: true
+  postgresql_storageClass: ""
+  volumePermissions:
+    enabled: false
+
+service:
+  type: "LoadBalancer"
