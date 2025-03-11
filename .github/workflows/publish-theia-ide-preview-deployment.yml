@@ -88,3 +88,75 @@ jobs:
           push: true
           tags: |
             europe-west3-docker.pkg.dev/kubernetes-238012/theia-ide-preview/theia-ide-preview:${{ env.IMAGE_TAG }}
+            
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@d0cee45012069b163a631894b98904a9e6723729 # v2.3.3
+        with:
+          cluster_name: github-theia-ide-preview
+          location: europe-west3-c
+      
+      - name: List sessions in theia-cloud namespace
+        run: kubectl get sessions -n theia-cloud
+      
+      - name: List apps in theia-cloud namespace
+        run: kubectl get appdefinitions -n theia-cloud
+
+      - name: Delete app definition if existent
+        run: kubectl delete appdefinitions theia-ide-${{ env.IMAGE_TAG }} -n theia-cloud || true
+
+      - name: Delete existing sessions
+        run: kubectl get sessions -n theia-cloud -o json | jq -r '.items[] | select(.spec.appDefinition == "theia-ide-${{ env.IMAGE_TAG }}") | .metadata.name' | xargs -r kubectl delete sessions -n theia-cloud
+
+      - name: Create app definition
+        run: |
+          cat <<EOF | kubectl apply -f -
+            apiVersion: theia.cloud/v1beta10
+            kind: AppDefinition
+            metadata:
+              name: theia-ide-${{ env.IMAGE_TAG }}
+              namespace: theia-cloud
+            spec:
+              downlinkLimit: 30000
+              image: europe-west3-docker.pkg.dev/kubernetes-238012/theia-ide-preview/theia-ide-preview:${{ env.IMAGE_TAG }}
+              imagePullPolicy: Always
+              ingressname: theia-cloud-demo-ws-ingress
+              limitsCpu: "2"
+              limitsMemory: 500M
+              maxInstances: 3
+              minInstances: 0
+              mountPath: /home/project/persisted
+              name: theia-ide-${{ env.IMAGE_TAG }}
+              port: 3000
+              requestsCpu: "100m"
+              requestsMemory: 300M
+              timeout: 15
+              uid: 101
+              uplinkLimit: 30000
+          EOF
+
+      - name: Update bot comment with  URL
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #7.0.1
+        with:
+          script: |
+            const {data: comments} = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.number,
+            })
+            const botComment = comments.find(comment => comment.user.id === 41898282)
+            const commentBody = "Preview deployment created at https://launch.theia-ide-preview.eclipsesource-munich.com/?appDef=theia-ide-${{ env.IMAGE_TAG }}\n\nWhen the deployment is cleaned up, this link will be removed again."
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.number,
+                body: commentBody
+              })
+            }

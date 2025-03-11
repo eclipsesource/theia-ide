@@ -67,6 +67,9 @@ resource "google_container_cluster" "primary" {
   remove_default_node_pool = true
   initial_node_count       = 1
   project                  = "kubernetes-238012"
+  workload_identity_config {
+    workload_pool = "kubernetes-238012.svc.id.goog"
+  }
 }
 
 # Node Pool
@@ -119,6 +122,10 @@ provider "helm" {
     host                   = "https://${google_container_cluster.primary.endpoint}"
     token                  = data.google_client_config.default.access_token
     cluster_ca_certificate = base64decode(google_container_cluster.primary.master_auth[0].cluster_ca_certificate)
+    exec {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      command     = "gke-gcloud-auth-plugin"
+    }
   }
 }
 provider "kubectl" {
@@ -126,6 +133,10 @@ provider "kubectl" {
   host                   = "https://${google_container_cluster.primary.endpoint}"
   token                  = data.google_client_config.default.access_token
   cluster_ca_certificate = base64decode(google_container_cluster.primary.master_auth[0].cluster_ca_certificate)
+  exec {
+    api_version = "client.authentication.k8s.io/v1beta1"
+    command     = "gke-gcloud-auth-plugin"
+  }
 }
 
 # Install cert-manager
@@ -399,4 +410,55 @@ resource "helm_release" "theia-cloud" {
     name  = "keycloak.cookieSecret"
     value = var.cookiesecret
   }
+}
+
+# Configure service account
+#
+resource "kubectl_manifest" "cluster-role" {
+  depends_on = [helm_release.theia-cloud-crds]
+  yaml_body  = <<-EOF
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: custom-resource-manager
+  rules:
+    - apiGroups: ["theia.cloud"]
+      resources: ["appdefinitions", "sessions"]
+      verbs: ["get", "list", "create", "delete"]
+  EOF
+}
+resource "kubectl_manifest" "cluster-role-binding" {
+  depends_on = [kubectl_manifest.cluster-role]
+  yaml_body  = <<-EOF
+  apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: custom-resource-binding
+  subjects:
+    - kind: User
+      name: "github-theia-preview-deployer@kubernetes-238012.iam.gserviceaccount.com"
+      apiGroup: rbac.authorization.k8s.io
+  roleRef:
+    kind: ClusterRole
+    name: custom-resource-manager
+    apiGroup: rbac.authorization.k8s.io
+  EOF
+}
+resource "kubectl_manifest" "github-deployer-sa" {
+  yaml_body = <<-EOF
+  apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: github-deployer
+    namespace: theia-cloud
+    annotations:
+      iam.gke.io/gcp-service-account: github-theia-preview-deployer@kubernetes-238012.iam.gserviceaccount.com
+  EOF
+}
+resource "google_service_account_iam_binding" "workload-identity-binding" {
+  service_account_id = "projects/kubernetes-238012/serviceAccounts/github-theia-preview-deployer@kubernetes-238012.iam.gserviceaccount.com"
+  role               = "roles/iam.workloadIdentityUser"
+  members = [
+    "serviceAccount:kubernetes-238012.svc.id.goog[theia-cloud/github-deployer]"
+  ]
 }

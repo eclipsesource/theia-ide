@@ -3,7 +3,7 @@ app:
   name: Theia IDE Preview
 
 demoApplication:
-  install: false
+  install: true # at the moment we will lose the ingress if we delete the last app def
 
 hosts:
   usePaths: false
@@ -20,7 +20,7 @@ keycloak:
   enable: true
   realm: "TheiaCloud"
   clientId: "theia-cloud"
-  authUrl: "https://theia-ide-preview.eclipsesource-munich.com/keycloak"
+  authUrl: "https://theia-ide-preview.eclipsesource-munich.com/keycloak/"
 
 operator:
   eagerStart: false
