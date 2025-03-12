@@ -158,7 +158,7 @@ export class TheiaIDEGettingStartedWidget extends GettingStartedWidget {
         return <div className='gs-section'>
             <div className='flex-grid'>
                 <div className='col'>
-                    <h3 className='gs-section-header'> 🚀 AI Support in the Theia IDE is available! [Experimental] ✨</h3>
+                    <h3 className='gs-section-header'> 🚀 AI Support in the Theia IDE is available!!!!!11 [Experimental] ✨</h3>
 
                     <div className='gs-action-container'>
                         Theia IDE now contains experimental AI support, which offers early access to cutting-edge AI capabilities within your IDE.
