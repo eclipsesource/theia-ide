@@ -25,7 +25,7 @@ keycloak:
 operator:
   eagerStart: false
   bandwidthLimiter: "WONDERSHAPER"
-  sessionsPerUser: "1"
+  sessionsPerUser: "3"
   storageClassName: ""
 
 ingress:
