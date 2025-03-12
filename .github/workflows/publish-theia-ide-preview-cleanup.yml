@@ -1,0 +1,110 @@
+name: Cleanup Theia IDE Preview Deployment
+
+permissions:
+  contents: read
+  pull-requests: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The image's tag
+        required: true
+        default: next
+      theia_version:
+        description: Theia Version
+        required: false
+        default: next
+  pull_request:
+    branches: [master]
+    types:
+      - closed
+
+jobs:
+  build:
+    name: Cleanup Theia IDE Preview image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      
+      - name: Set the Theia version
+        id: set-theia-version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "THEIA_VERSION=${{ github.event.inputs.theia_version }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "THEIA_VERSION=" >> $GITHUB_ENV
+          else
+            echo "THEIA_VERSION=next" >> $GITHUB_ENV
+          fi
+
+      - name: Set image tag
+        id: set-tag
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "IMAGE_TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "IMAGE_TAG=pr-${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "schedule" ]; then
+            echo "IMAGE_TAG=weekly" >> $GITHUB_ENV
+          else
+            echo "IMAGE_TAG=other" >> $GITHUB_ENV
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@71f986410dfbc7added4569d411d040a91dc6935 # v2.1.8
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: kubernetes-238012
+          create_credentials_file: true
+
+      - name: Setup Google Cloud SDK
+        uses: google-github-actions/setup-gcloud@77e7a554d41e2ee56fc945c52dfd3f33d12def9a # v2.1.4
+            
+      - name: Get GKE Credentials
+        uses: google-github-actions/get-gke-credentials@d0cee45012069b163a631894b98904a9e6723729 # v2.3.3
+        with:
+          cluster_name: github-theia-ide-preview
+          location: europe-west3-c
+      
+      - name: List sessions in theia-cloud namespace
+        run: kubectl get sessions -n theia-cloud
+      
+      - name: List apps in theia-cloud namespace
+        run: kubectl get appdefinitions -n theia-cloud
+
+      - name: Delete app definition if existent
+        run: kubectl delete appdefinitions theia-ide-${{ env.IMAGE_TAG }} -n theia-cloud || true
+
+      - name: Delete existing sessions
+        run: kubectl get sessions -n theia-cloud -o json | jq -r '.items[] | select(.spec.appDefinition == "theia-ide-${{ env.IMAGE_TAG }}") | .metadata.name' | xargs -r kubectl delete sessions -n theia-cloud
+
+      - name: Update bot comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea #7.0.1
+        with:
+          script: |
+            const {data: comments} = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.number,
+            })
+            const botComment = comments.find(comment => comment.user.id === 41898282)
+            const commentBody = "No Preview Deployment"
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: commentBody
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.number,
+                body: commentBody
+              })
+            }

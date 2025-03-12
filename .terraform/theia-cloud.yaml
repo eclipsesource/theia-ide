@@ -1,0 +1,37 @@
+app:
+  id: idepreview
+  name: Theia IDE Preview
+
+demoApplication:
+  install: true # at the moment we will lose the ingress if we delete the last app def
+
+hosts:
+  usePaths: false
+  configuration:
+    baseHost: theia-ide-preview.eclipsesource-munich.com
+    service: servicex
+    landing: launch
+    instance: a
+
+landingPage:
+  ephemeralStorage: true
+
+keycloak:
+  enable: true
+  realm: "TheiaCloud"
+  clientId: "theia-cloud"
+  authUrl: "https://theia-ide-preview.eclipsesource-munich.com/keycloak/"
+
+operator:
+  eagerStart: false
+  bandwidthLimiter: "WONDERSHAPER"
+  sessionsPerUser: "3"
+  storageClassName: ""
+
+ingress:
+  clusterIssuer: letsencrypt-prod
+  instances:
+    name: "theia-cloud-demo-ws-ingress"
+
+monitor:
+  enable: false
