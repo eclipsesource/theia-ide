@@ -87,7 +87,7 @@ export class TheiaIDEAboutDialog extends AboutDialog {
 
     protected renderTitle(): React.ReactNode {
         return <div className='gs-header'>
-            <h1>Eclipse Theia <span className='gs-blue-header'>IDE</span></h1>
+            <h1>Eclipse Theia <span className='gs-blue-header'>Next Gen IDE</span></h1>
             {this.renderVersion()}
         </div>;
     }
