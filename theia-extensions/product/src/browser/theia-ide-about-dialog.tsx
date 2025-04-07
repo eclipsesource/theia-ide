@@ -95,7 +95,7 @@ export class TheiaIDEAboutDialog extends AboutDialog {
     protected renderVersion(): React.ReactNode {
         return <div>
             <p className='gs-sub-header' >
-                {this.applicationInfo ? 'Version ' + this.applicationInfo.version : '-'}
+                {this.applicationInfo ? 'v' + this.applicationInfo.version : '-'}
             </p>
 
             <p className='gs-sub-header' >
